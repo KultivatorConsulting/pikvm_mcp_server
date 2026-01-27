@@ -116,7 +116,12 @@ export class PiKVMClient {
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`PiKVM API error ${response.status}: ${errorText}`);
+      // Sanitize error text to avoid exposing sensitive information
+      const sanitizedError = errorText
+        .replace(/password[=:][^\s,"]*/gi, 'password=[REDACTED]')
+        .replace(/X-KVMD-Passwd[^,\s"]*/gi, 'X-KVMD-Passwd=[REDACTED]')
+        .substring(0, 200); // Limit error message length
+      throw new Error(`PiKVM API error ${response.status}: ${sanitizedError}`);
     }
 
     // Check content type for response handling
@@ -187,9 +192,16 @@ export class PiKVMClient {
     }
 
     const response = await this.request<StreamerResponse>('GET', '/streamer');
+
+    // Defensive null checks for nested API response structure
+    const resolution = response?.result?.streamer?.source?.resolution;
+    if (!resolution || typeof resolution.width !== 'number' || typeof resolution.height !== 'number') {
+      throw new Error('Invalid or missing resolution data from PiKVM streamer API');
+    }
+
     this.cachedResolution = {
-      width: response.result.streamer.source.resolution.width,
-      height: response.result.streamer.source.resolution.height,
+      width: resolution.width,
+      height: resolution.height,
     };
     return this.cachedResolution;
   }

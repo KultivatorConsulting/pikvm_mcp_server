@@ -16,15 +16,10 @@ pikvm_mcp_server/
 ├── CONTEXT.md          # Background research and design notes
 ├── API_REFERENCE.md    # PiKVM API documentation
 ├── src/                # Source code
-│   ├── index.ts        # Main MCP server entry point
-│   ├── tools/          # MCP tool implementations
-│   │   ├── screenshot.ts
-│   │   ├── type.ts
-│   │   ├── keyboard.ts
-│   │   └── mouse.ts
-│   ├── pikvm/          # PiKVM API client
-│   │   └── client.ts
-│   └── config.ts       # Configuration handling
+│   ├── index.ts        # Main MCP server entry point (includes all tool handlers)
+│   ├── config.ts       # Configuration handling
+│   └── pikvm/          # PiKVM API client
+│       └── client.ts
 ├── package.json
 └── tsconfig.json
 ```
@@ -41,8 +36,8 @@ npm run build
 # Run in development
 npm run dev
 
-# Run tests
-npm test
+# Type checking
+npm run typecheck
 ```
 
 ## Configuration
@@ -57,12 +52,14 @@ The server is configured via environment variables or a config file:
 
 ## MCP Tools Provided
 
-1. **`pikvm_screenshot`** - Capture current screen
-2. **`pikvm_type`** - Type text (handles special chars correctly)
-3. **`pikvm_key`** - Send key/combo (e.g., Ctrl+Alt+Del)
-4. **`pikvm_mouse_move`** - Move mouse cursor
-5. **`pikvm_mouse_click`** - Click mouse button
-6. **`pikvm_mouse_scroll`** - Scroll wheel
+1. **`pikvm_screenshot`** - Capture current screen as JPEG
+2. **`pikvm_get_resolution`** - Get current screen resolution (useful for mouse coordinates)
+3. **`pikvm_type`** - Type text (handles special chars correctly via keymap)
+4. **`pikvm_key`** - Send key/combo (e.g., Ctrl+Alt+Del)
+5. **`pikvm_shortcut`** - Send keyboard shortcut (multiple keys pressed simultaneously)
+6. **`pikvm_mouse_move`** - Move mouse cursor (absolute or relative)
+7. **`pikvm_mouse_click`** - Click mouse button
+8. **`pikvm_mouse_scroll`** - Scroll wheel
 
 ## Key Implementation Notes
 

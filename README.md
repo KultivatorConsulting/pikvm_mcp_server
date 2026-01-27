@@ -73,9 +73,17 @@ Capture a screenshot from the remote machine.
 
 ```
 Parameters:
-- maxWidth (optional): Maximum width in pixels
-- maxHeight (optional): Maximum height in pixels
+- maxWidth (optional): Maximum width in pixels (1-10000)
+- maxHeight (optional): Maximum height in pixels (1-10000)
 - quality (optional): JPEG quality 1-100
+```
+
+### pikvm_get_resolution
+Get the current screen resolution of the remote machine. Useful for knowing valid coordinate ranges for mouse operations.
+
+```
+Parameters: none
+Returns: Screen resolution (width x height) and valid coordinate ranges
 ```
 
 ### pikvm_type
@@ -122,7 +130,8 @@ Click a mouse button.
 
 ```
 Parameters:
-- button (optional): "left", "right", or "middle" (default: "left")
+- button (optional): "left", "right", "middle", "up", or "down" (default: "left")
+  Note: "up" and "down" are scroll wheel buttons
 - x (optional): X coordinate to move to first
 - y (optional): Y coordinate to move to first
 - state (optional): "press", "release", or "click" (default)

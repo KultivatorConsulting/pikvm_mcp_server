@@ -18,6 +18,98 @@ import { loadConfig } from './config.js';
 // Defer initialization to main() for proper error handling
 let pikvm: PiKVMClient;
 
+// ============================================================================
+// Input Validation Helpers
+// ============================================================================
+
+/**
+ * Validate that a value is a string, returning undefined if not
+ */
+function validateString(value: unknown): string | undefined {
+  return typeof value === 'string' ? value : undefined;
+}
+
+/**
+ * Validate that a value is a string and non-empty, throwing if required but missing
+ */
+function requireString(value: unknown, fieldName: string): string {
+  if (typeof value !== 'string' || value.length === 0) {
+    throw new Error(`${fieldName} is required and must be a non-empty string`);
+  }
+  return value;
+}
+
+/**
+ * Validate and clamp a number to bounds, returning undefined if not a number
+ */
+function validateNumber(value: unknown, min?: number, max?: number): number | undefined {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return undefined;
+  }
+  let result = value;
+  if (min !== undefined) result = Math.max(min, result);
+  if (max !== undefined) result = Math.min(max, result);
+  return result;
+}
+
+/**
+ * Validate that a value is a number, throwing if required but missing
+ */
+function requireNumber(value: unknown, fieldName: string, min?: number, max?: number): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new Error(`${fieldName} is required and must be a number`);
+  }
+  let result = value;
+  if (min !== undefined) result = Math.max(min, result);
+  if (max !== undefined) result = Math.min(max, result);
+  return result;
+}
+
+/**
+ * Validate that a value is a boolean
+ */
+function validateBoolean(value: unknown): boolean | undefined {
+  return typeof value === 'boolean' ? value : undefined;
+}
+
+/**
+ * Validate that a value is an array of strings with at least one element
+ */
+function requireStringArray(value: unknown, fieldName: string, minLength = 1): string[] {
+  if (!Array.isArray(value) || value.length < minLength) {
+    throw new Error(`${fieldName} must be an array with at least ${minLength} element(s)`);
+  }
+  const result: string[] = [];
+  for (const item of value) {
+    if (typeof item !== 'string') {
+      throw new Error(`${fieldName} must contain only strings`);
+    }
+    result.push(item);
+  }
+  return result;
+}
+
+/**
+ * Validate optional string array
+ */
+function validateStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is string => typeof item === 'string');
+}
+
+/**
+ * Validate enum value
+ */
+function validateEnum<T extends string>(value: unknown, allowed: readonly T[], defaultValue: T): T {
+  if (typeof value === 'string' && allowed.includes(value as T)) {
+    return value as T;
+  }
+  return defaultValue;
+}
+
+const VALID_BUTTONS = ['left', 'right', 'middle', 'up', 'down'] as const;
+const VALID_KEY_STATES = ['press', 'release', 'click'] as const;
+
 // Define available tools
 const tools: Tool[] = [
   {
@@ -209,9 +301,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     switch (name) {
       case 'pikvm_screenshot': {
         const buffer = await pikvm.screenshot({
-          maxWidth: args.maxWidth as number | undefined,
-          maxHeight: args.maxHeight as number | undefined,
-          quality: args.quality as number | undefined,
+          maxWidth: validateNumber(args.maxWidth, 1, 10000),
+          maxHeight: validateNumber(args.maxHeight, 1, 10000),
+          quality: validateNumber(args.quality, 1, 100),
         });
         return {
           content: [
@@ -237,27 +329,23 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case 'pikvm_type': {
-        const text = args.text as string;
-        if (!text) {
-          throw new Error('text is required');
-        }
+        const text = requireString(args.text, 'text');
         await pikvm.type(text, {
-          keymap: args.keymap as string | undefined,
-          slow: args.slow as boolean | undefined,
-          delay: args.delay as number | undefined,
+          keymap: validateString(args.keymap),
+          slow: validateBoolean(args.slow),
+          delay: validateNumber(args.delay, 0, 200),
         });
+        // Don't echo full text in response to avoid leaking sensitive input
+        const displayText = text.length > 50 ? `${text.substring(0, 50)}...` : text;
         return {
-          content: [{ type: 'text', text: `Typed: "${text}"` }],
+          content: [{ type: 'text', text: `Typed ${text.length} character(s): "${displayText}"` }],
         };
       }
 
       case 'pikvm_key': {
-        const key = args.key as string;
-        if (!key) {
-          throw new Error('key is required');
-        }
-        const modifiers = (args.modifiers as string[] | undefined) || [];
-        const state = args.state as 'press' | 'release' | 'click' | undefined;
+        const key = requireString(args.key, 'key');
+        const modifiers = validateStringArray(args.modifiers);
+        const state = validateEnum(args.state, VALID_KEY_STATES, 'click');
 
         // Press modifiers
         for (const mod of modifiers) {
@@ -291,9 +379,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case 'pikvm_shortcut': {
-        const keys = args.keys as string[];
-        if (!keys || keys.length === 0) {
-          throw new Error('keys array is required');
+        const keys = requireStringArray(args.keys, 'keys', 1);
+        if (keys.length > 10) {
+          throw new Error('keys array must have at most 10 elements');
         }
         await pikvm.sendShortcut(keys);
         return {
@@ -302,16 +390,17 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case 'pikvm_mouse_move': {
-        const x = args.x as number;
-        const y = args.y as number;
-        if (x === undefined || y === undefined) {
-          throw new Error('x and y are required');
-        }
-        const relative = args.relative as boolean | undefined;
+        const x = requireNumber(args.x, 'x');
+        const y = requireNumber(args.y, 'y');
+        const relative = validateBoolean(args.relative) ?? false;
         if (relative) {
+          // Relative moves are clamped to -127 to 127 in the client
           await pikvm.mouseMoveRelative(x, y);
         } else {
-          await pikvm.mouseMove(x, y);
+          // Absolute moves should be positive pixel coordinates
+          const clampedX = Math.max(0, Math.round(x));
+          const clampedY = Math.max(0, Math.round(y));
+          await pikvm.mouseMove(clampedX, clampedY);
         }
         return {
           content: [
@@ -319,23 +408,23 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               type: 'text',
               text: relative
                 ? `Moved mouse by (${x}, ${y})`
-                : `Moved mouse to pixel (${x}, ${y})`,
+                : `Moved mouse to pixel (${Math.max(0, Math.round(x))}, ${Math.max(0, Math.round(y))})`,
             },
           ],
         };
       }
 
       case 'pikvm_mouse_click': {
-        const button = (args.button as 'left' | 'right' | 'middle' | 'up' | 'down') || 'left';
-        const clickX = args.x as number | undefined;
-        const clickY = args.y as number | undefined;
+        const button = validateEnum(args.button, VALID_BUTTONS, 'left');
+        const clickX = validateNumber(args.x, 0);
+        const clickY = validateNumber(args.y, 0);
 
         // Move to position first if specified
         if (clickX !== undefined && clickY !== undefined) {
-          await pikvm.mouseMove(clickX, clickY);
+          await pikvm.mouseMove(Math.round(clickX), Math.round(clickY));
         }
 
-        const state = args.state as 'press' | 'release' | 'click' | undefined;
+        const state = validateEnum(args.state, VALID_KEY_STATES, 'click');
         if (state === 'press') {
           await pikvm.mouseClick(button, { state: true });
         } else if (state === 'release') {
@@ -350,11 +439,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case 'pikvm_mouse_scroll': {
-        const deltaY = args.deltaY as number;
-        if (deltaY === undefined) {
-          throw new Error('deltaY is required');
-        }
-        const deltaX = (args.deltaX as number) || 0;
+        const deltaY = requireNumber(args.deltaY, 'deltaY');
+        const deltaX = validateNumber(args.deltaX) ?? 0;
         await pikvm.mouseScroll(deltaX, deltaY);
         return {
           content: [
@@ -370,7 +456,16 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         throw new Error(`Unknown tool: ${name}`);
     }
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    // Sanitize error messages to avoid exposing sensitive information
+    let message: string;
+    if (error instanceof Error) {
+      // Strip any potential credential information from error messages
+      message = error.message
+        .replace(/X-KVMD-Passwd[^,\s]*/gi, 'X-KVMD-Passwd=[REDACTED]')
+        .replace(/password[=:][^\s,]*/gi, 'password=[REDACTED]');
+    } else {
+      message = 'An unexpected error occurred';
+    }
     return {
       content: [{ type: 'text', text: `Error: ${message}` }],
       isError: true,
