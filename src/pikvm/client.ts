@@ -1,7 +1,8 @@
 /**
  * PiKVM API Client
  *
- * Handles communication with PiKVM's REST API for HID control and screenshots.
+ * Handles communication with PiKVM's REST API for HID control.
+ * All mouse operations use the REST API which is more reliable than WebSocket.
  */
 
 import { Agent, fetch } from 'undici';
@@ -22,10 +23,6 @@ export interface TypeOptions {
 
 export interface KeyOptions {
   state?: boolean; // true = press, false = release, undefined = press+release
-}
-
-export interface MouseMoveOptions {
-  relative?: boolean;
 }
 
 export interface ScreenResolution {
@@ -75,6 +72,13 @@ export class PiKVMClient {
         rejectUnauthorized: this.config.verifySsl,
       },
     });
+  }
+
+  /**
+   * Close any resources (no-op for REST-only client, kept for API compatibility)
+   */
+  close(): void {
+    // No resources to close when using REST API only
   }
 
   /**
@@ -171,10 +175,12 @@ export class PiKVMClient {
     interface StreamerResponse {
       ok: boolean;
       result: {
-        source: {
-          resolution: {
-            width: number;
-            height: number;
+        streamer: {
+          source: {
+            resolution: {
+              width: number;
+              height: number;
+            };
           };
         };
       };
@@ -182,8 +188,8 @@ export class PiKVMClient {
 
     const response = await this.request<StreamerResponse>('GET', '/streamer');
     this.cachedResolution = {
-      width: response.result.source.resolution.width,
-      height: response.result.source.resolution.height,
+      width: response.result.streamer.source.resolution.width,
+      height: response.result.streamer.source.resolution.height,
     };
     return this.cachedResolution;
   }
@@ -232,7 +238,7 @@ export class PiKVMClient {
   }
 
   /**
-   * Move mouse to absolute pixel position
+   * Move mouse to absolute pixel position (via REST API)
    * Coordinates are automatically converted to PiKVM's normalized range
    * @param x - X coordinate in pixels (0 = left edge)
    * @param y - Y coordinate in pixels (0 = top edge)
@@ -250,7 +256,7 @@ export class PiKVMClient {
   }
 
   /**
-   * Move mouse relative to current position
+   * Move mouse relative to current position (via REST API)
    * @param deltaX - Horizontal movement (negative = left, positive = right)
    * @param deltaY - Vertical movement (negative = up, positive = down)
    */
@@ -267,25 +273,31 @@ export class PiKVMClient {
   }
 
   /**
-   * Click mouse button
+   * Click mouse button (via REST API)
    */
   async mouseClick(button: MouseButton = 'left', options?: KeyOptions): Promise<void> {
     const params = new URLSearchParams();
     params.set('button', button);
+
     if (options?.state !== undefined) {
       params.set('state', options.state.toString());
+      await this.request('POST', `/hid/events/send_mouse_button?${params}`);
+    } else {
+      // Full click: press then release
+      params.set('state', 'true');
+      await this.request('POST', `/hid/events/send_mouse_button?${params}`);
+      params.set('state', 'false');
+      await this.request('POST', `/hid/events/send_mouse_button?${params}`);
     }
-
-    await this.request('POST', `/hid/events/send_mouse_button?${params}`);
   }
 
   /**
-   * Scroll mouse wheel
+   * Scroll mouse wheel (via REST API)
    */
   async mouseScroll(deltaX: number, deltaY: number): Promise<void> {
     const params = new URLSearchParams();
-    params.set('delta_x', deltaX.toString());
-    params.set('delta_y', deltaY.toString());
+    params.set('delta_x', Math.round(deltaX).toString());
+    params.set('delta_y', Math.round(deltaY).toString());
 
     await this.request('POST', `/hid/events/send_mouse_wheel?${params}`);
   }
