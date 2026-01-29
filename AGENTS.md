@@ -1,4 +1,4 @@
-# CLAUDE.md - PiKVM MCP Server
+# AGENTS.md - PiKVM MCP Server
 
 ## Project Overview
 
@@ -12,7 +12,7 @@ Browser automation through PiKVM's web interface has keyboard input issues - spe
 
 ```
 pikvm_mcp_server/
-├── CLAUDE.md           # This file - instructions for Claude
+├── AGENTS.md           # This file - instructions for AI agents
 ├── CONTEXT.md          # Background research and design notes
 ├── API_REFERENCE.md    # PiKVM API documentation
 ├── src/                # Source code

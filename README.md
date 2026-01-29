@@ -167,4 +167,4 @@ npx tsx test-client.ts
 
 ## License
 
-MIT
+GPL-3.0 - See [LICENSE](LICENSE) for details.
