@@ -16,10 +16,16 @@ pikvm_mcp_server/
 ├── CONTEXT.md          # Background research and design notes
 ├── API_REFERENCE.md    # PiKVM API documentation
 ├── src/                # Source code
-│   ├── index.ts        # Main MCP server entry point (includes all tool handlers)
+│   ├── index.ts        # Main MCP server entry point (tool + prompt handlers)
 │   ├── config.ts       # Configuration handling
-│   └── pikvm/          # PiKVM API client
-│       └── client.ts
+│   ├── pikvm/          # PiKVM API client
+│   │   └── client.ts
+│   └── prompts/        # MCP prompt definitions
+│       ├── types.ts    # PromptDefinition interface
+│       ├── tool-guides.ts  # 8 individual tool guide prompts
+│       ├── workflows.ts    # 5 multi-step workflow prompts
+│       └── index.ts    # Barrel export + lookup function
+├── docs/skills/        # Human-readable skill guides (mirrors prompts)
 ├── package.json
 └── tsconfig.json
 ```
@@ -71,6 +77,33 @@ The server is configured via environment variables or a config file:
 10. **`pikvm_set_calibration`** - Set calibration correction factors after visual verification
 11. **`pikvm_get_calibration`** - Get current calibration state
 12. **`pikvm_clear_calibration`** - Clear calibration, revert to uncalibrated mode
+
+## MCP Prompts (Skills)
+
+The server exposes 13 MCP prompts via `prompts/list` and `prompts/get`. These provide structured guidance for tool usage and multi-step workflows.
+
+### Tool Guides
+| Prompt | Covers |
+|---|---|
+| `take-screenshot` | pikvm_screenshot |
+| `check-resolution` | pikvm_get_resolution |
+| `type-text` | pikvm_type |
+| `send-key` | pikvm_key |
+| `send-shortcut` | pikvm_shortcut |
+| `move-mouse` | pikvm_mouse_move |
+| `click-element` | pikvm_mouse_click |
+| `scroll-page` | pikvm_mouse_scroll |
+
+### Workflow Recipes
+| Prompt | Arguments | Description |
+|---|---|---|
+| `setup-session-workflow` | — | Initialize session: resolution, screenshot, calibrate |
+| `calibrate-mouse-workflow` | — | Full mouse calibration procedure |
+| `click-ui-element-workflow` | element_description (required) | Find and click a UI element |
+| `fill-form-workflow` | form_description (optional) | Fill in form fields |
+| `navigate-desktop-workflow` | goal (required) | Navigate desktop with Observe-Plan-Act-Verify loop |
+
+Implementation: `src/prompts/` (types.ts, tool-guides.ts, workflows.ts, index.ts). Human-readable guides: `docs/skills/`.
 
 ## Key Implementation Notes
 

@@ -10,10 +10,13 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
+  ListPromptsRequestSchema,
+  GetPromptRequestSchema,
   Tool,
 } from '@modelcontextprotocol/sdk/types.js';
 import { PiKVMClient } from './pikvm/client.js';
 import { loadConfig } from './config.js';
+import { allPrompts, getPromptByName } from './prompts/index.js';
 
 // Defer initialization to main() for proper error handling
 let pikvm: PiKVMClient;
@@ -326,9 +329,38 @@ const server = new Server(
   {
     capabilities: {
       tools: {},
+      prompts: {},
     },
   }
 );
+
+// Handle list prompts request
+server.setRequestHandler(ListPromptsRequestSchema, async () => {
+  return {
+    prompts: allPrompts.map((p) => ({
+      name: p.name,
+      description: p.description,
+      arguments: p.arguments?.map((a) => ({
+        name: a.name,
+        description: a.description,
+        required: a.required,
+      })),
+    })),
+  };
+});
+
+// Handle get prompt request
+server.setRequestHandler(GetPromptRequestSchema, async (request) => {
+  const { name, arguments: args } = request.params;
+  const result = getPromptByName(name, args);
+  if (!result) {
+    throw new Error(`Unknown prompt: ${name}`);
+  }
+  return {
+    description: result.definition.description,
+    messages: result.messages,
+  };
+});
 
 // Handle list tools request
 server.setRequestHandler(ListToolsRequestSchema, async () => {

@@ -1,5 +1,11 @@
 # PiKVM MCP Server
 
+
+[![MCP Badge](https://lobehub.com/badge/mcp/kultivatorconsulting-pikvm_mcp_server?style=plastic)](https://lobehub.com/mcp/kultivatorconsulting-pikvm_mcp_server)
+
+
+
+
 Give AI agents hands. This MCP server connects Claude Code (or any MCP client) directly to a [PiKVM](https://pikvm.org/) device, giving AI full keyboard, mouse, and screen access to a physical machine -- no browser automation, no virtual desktops, no emulators.
 
 Point it at real hardware. Let the AI see the screen, type commands, click buttons, and navigate GUIs on a machine it could never otherwise touch.
@@ -101,6 +107,29 @@ Or if using the .env file:
 - **`pikvm_set_calibration`** - Apply correction factors calculated from calibration (required: factorX, factorY)
 - **`pikvm_get_calibration`** - Get current calibration state
 - **`pikvm_clear_calibration`** - Reset to uncalibrated mode
+
+## Skills (MCP Prompts)
+
+The server exposes 13 MCP prompts that provide structured guidance for agents. Use `prompts/list` to discover them or `prompts/get` to retrieve a specific guide.
+
+### Tool Guides
+- **`take-screenshot`** — Capturing screenshots with pikvm_screenshot
+- **`check-resolution`** — Checking screen resolution with pikvm_get_resolution
+- **`type-text`** — Typing text with pikvm_type
+- **`send-key`** — Sending keys with pikvm_key
+- **`send-shortcut`** — Sending keyboard shortcuts with pikvm_shortcut
+- **`move-mouse`** — Moving the mouse with pikvm_mouse_move
+- **`click-element`** — Clicking with pikvm_mouse_click
+- **`scroll-page`** — Scrolling with pikvm_mouse_scroll
+
+### Workflow Recipes
+- **`setup-session-workflow`** — Initialize a PiKVM session (resolution, screenshot, calibration)
+- **`calibrate-mouse-workflow`** — Calibrate mouse coordinates for accurate clicking
+- **`click-ui-element-workflow`** — Find and click a specific UI element *(arg: element_description)*
+- **`fill-form-workflow`** — Fill in a form on screen *(arg: form_description)*
+- **`navigate-desktop-workflow`** — Navigate a desktop environment *(arg: goal)*
+
+See [`docs/skills/`](docs/skills/) for detailed human-readable guides.
 
 ## Key Codes Reference
 
