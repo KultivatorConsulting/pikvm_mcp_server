@@ -108,26 +108,35 @@ Or if using the .env file:
 - **`pikvm_get_calibration`** - Get current calibration state
 - **`pikvm_clear_calibration`** - Reset to uncalibrated mode
 
-## Skills (MCP Prompts)
+## Skills (Prompts & Skill Tools)
 
-The server exposes 13 MCP prompts that provide structured guidance for agents. Use `prompts/list` to discover them or `prompts/get` to retrieve a specific guide.
+The server exposes 13 skills that provide structured guidance for agents. Each skill is available via **two discovery paths**:
+
+- **MCP Prompts** — `prompts/list` / `prompts/get` for clients that support the Prompts capability.
+- **Skill Tools** — `tools/list` / `tools/call` as `skill_*` read-only tools, ensuring visibility in marketplaces (e.g. LobeHub) that index tools only.
 
 ### Tool Guides
-- **`take-screenshot`** — Capturing screenshots with pikvm_screenshot
-- **`check-resolution`** — Checking screen resolution with pikvm_get_resolution
-- **`type-text`** — Typing text with pikvm_type
-- **`send-key`** — Sending keys with pikvm_key
-- **`send-shortcut`** — Sending keyboard shortcuts with pikvm_shortcut
-- **`move-mouse`** — Moving the mouse with pikvm_mouse_move
-- **`click-element`** — Clicking with pikvm_mouse_click
-- **`scroll-page`** — Scrolling with pikvm_mouse_scroll
+
+| Prompt Name | Skill Tool | Description |
+|---|---|---|
+| `take-screenshot` | `skill_take_screenshot` | Capturing screenshots with pikvm_screenshot |
+| `check-resolution` | `skill_check_resolution` | Checking screen resolution with pikvm_get_resolution |
+| `type-text` | `skill_type_text` | Typing text with pikvm_type |
+| `send-key` | `skill_send_key` | Sending keys with pikvm_key |
+| `send-shortcut` | `skill_send_shortcut` | Sending keyboard shortcuts with pikvm_shortcut |
+| `move-mouse` | `skill_move_mouse` | Moving the mouse with pikvm_mouse_move |
+| `click-element` | `skill_click_element` | Clicking with pikvm_mouse_click |
+| `scroll-page` | `skill_scroll_page` | Scrolling with pikvm_mouse_scroll |
 
 ### Workflow Recipes
-- **`setup-session-workflow`** — Initialize a PiKVM session (resolution, screenshot, calibration)
-- **`calibrate-mouse-workflow`** — Calibrate mouse coordinates for accurate clicking
-- **`click-ui-element-workflow`** — Find and click a specific UI element *(arg: element_description)*
-- **`fill-form-workflow`** — Fill in a form on screen *(arg: form_description)*
-- **`navigate-desktop-workflow`** — Navigate a desktop environment *(arg: goal)*
+
+| Prompt Name | Skill Tool | Arguments | Description |
+|---|---|---|---|
+| `setup-session-workflow` | `skill_setup_session_workflow` | — | Initialize a PiKVM session |
+| `calibrate-mouse-workflow` | `skill_calibrate_mouse_workflow` | — | Calibrate mouse coordinates |
+| `click-ui-element-workflow` | `skill_click_ui_element_workflow` | `element_description` (required) | Find and click a UI element |
+| `fill-form-workflow` | `skill_fill_form_workflow` | `form_description` (optional) | Fill in a form on screen |
+| `navigate-desktop-workflow` | `skill_navigate_desktop_workflow` | `goal` (required) | Navigate a desktop environment |
 
 See [`docs/skills/`](docs/skills/) for detailed human-readable guides.
 

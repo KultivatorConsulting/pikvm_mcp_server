@@ -24,6 +24,7 @@ pikvm_mcp_server/
 │       ├── types.ts    # PromptDefinition interface
 │       ├── tool-guides.ts  # 8 individual tool guide prompts
 │       ├── workflows.ts    # 5 multi-step workflow prompts
+│       ├── skill-tools.ts  # Auto-generated skill_* tools from prompts
 │       └── index.ts    # Barrel export + lookup function
 ├── docs/skills/        # Human-readable skill guides (mirrors prompts)
 ├── package.json
@@ -78,32 +79,34 @@ The server is configured via environment variables or a config file:
 11. **`pikvm_get_calibration`** - Get current calibration state
 12. **`pikvm_clear_calibration`** - Clear calibration, revert to uncalibrated mode
 
-## MCP Prompts (Skills)
+## MCP Prompts & Skill Tools
 
-The server exposes 13 MCP prompts via `prompts/list` and `prompts/get`. These provide structured guidance for tool usage and multi-step workflows.
+The server exposes 13 skills as both MCP prompts (`prompts/list` / `prompts/get`) and read-only `skill_*` tools (`tools/list` / `tools/call`). The skill tools are auto-generated from prompt definitions for marketplace visibility (e.g. LobeHub indexes tools, not prompts).
+
+**Total tools: 25** (12 `pikvm_*` hardware tools + 13 `skill_*` guidance tools)
 
 ### Tool Guides
-| Prompt | Covers |
-|---|---|
-| `take-screenshot` | pikvm_screenshot |
-| `check-resolution` | pikvm_get_resolution |
-| `type-text` | pikvm_type |
-| `send-key` | pikvm_key |
-| `send-shortcut` | pikvm_shortcut |
-| `move-mouse` | pikvm_mouse_move |
-| `click-element` | pikvm_mouse_click |
-| `scroll-page` | pikvm_mouse_scroll |
+| Prompt | Skill Tool | Covers |
+|---|---|---|
+| `take-screenshot` | `skill_take_screenshot` | pikvm_screenshot |
+| `check-resolution` | `skill_check_resolution` | pikvm_get_resolution |
+| `type-text` | `skill_type_text` | pikvm_type |
+| `send-key` | `skill_send_key` | pikvm_key |
+| `send-shortcut` | `skill_send_shortcut` | pikvm_shortcut |
+| `move-mouse` | `skill_move_mouse` | pikvm_mouse_move |
+| `click-element` | `skill_click_element` | pikvm_mouse_click |
+| `scroll-page` | `skill_scroll_page` | pikvm_mouse_scroll |
 
 ### Workflow Recipes
-| Prompt | Arguments | Description |
-|---|---|---|
-| `setup-session-workflow` | — | Initialize session: resolution, screenshot, calibrate |
-| `calibrate-mouse-workflow` | — | Full mouse calibration procedure |
-| `click-ui-element-workflow` | element_description (required) | Find and click a UI element |
-| `fill-form-workflow` | form_description (optional) | Fill in form fields |
-| `navigate-desktop-workflow` | goal (required) | Navigate desktop with Observe-Plan-Act-Verify loop |
+| Prompt | Skill Tool | Arguments | Description |
+|---|---|---|---|
+| `setup-session-workflow` | `skill_setup_session_workflow` | — | Initialize session: resolution, screenshot, calibrate |
+| `calibrate-mouse-workflow` | `skill_calibrate_mouse_workflow` | — | Full mouse calibration procedure |
+| `click-ui-element-workflow` | `skill_click_ui_element_workflow` | element_description (required) | Find and click a UI element |
+| `fill-form-workflow` | `skill_fill_form_workflow` | form_description (optional) | Fill in form fields |
+| `navigate-desktop-workflow` | `skill_navigate_desktop_workflow` | goal (required) | Navigate desktop with Observe-Plan-Act-Verify loop |
 
-Implementation: `src/prompts/` (types.ts, tool-guides.ts, workflows.ts, index.ts). Human-readable guides: `docs/skills/`.
+Implementation: `src/prompts/` (types.ts, tool-guides.ts, workflows.ts, skill-tools.ts, index.ts). Human-readable guides: `docs/skills/`.
 
 ## Key Implementation Notes
 

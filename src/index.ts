@@ -17,6 +17,7 @@ import {
 import { PiKVMClient } from './pikvm/client.js';
 import { loadConfig } from './config.js';
 import { allPrompts, getPromptByName } from './prompts/index.js';
+import { skillTools, isSkillTool, handleSkillToolCall } from './prompts/skill-tools.js';
 
 // Defer initialization to main() for proper error handling
 let pikvm: PiKVMClient;
@@ -318,6 +319,7 @@ const tools: Tool[] = [
       properties: {},
     },
   },
+  ...skillTools,
 ];
 
 // Create MCP server
@@ -372,6 +374,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args = {} } = request.params;
 
   try {
+    if (isSkillTool(name)) {
+      return handleSkillToolCall(name, args);
+    }
+
     switch (name) {
       case 'pikvm_screenshot': {
         const result = await pikvm.screenshot({
