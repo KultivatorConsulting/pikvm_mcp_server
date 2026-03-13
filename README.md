@@ -58,6 +58,8 @@ PIKVM_DEFAULT_KEYMAP=en-us
 
 ## Usage with Claude Code
 
+> **Requires Node.js 18+.** This server uses ES modules. If `node --version` shows an older version, replace `"command": "node"` with the full path to a compatible binary (e.g. `"/usr/local/bin/node"` or your nvm path like `"~/.nvm/versions/node/v22.x.x/bin/node"`). This is common when nvm's default alias points to an older version.
+
 Add to your Claude Code MCP settings (`~/.config/claude-code/settings.json` or via the settings UI):
 
 ```json
