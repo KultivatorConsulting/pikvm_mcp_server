@@ -179,6 +179,12 @@ Common key codes for `pikvm_key` and `pikvm_shortcut`:
 - Special: `Enter`, `Escape`, `Backspace`, `Tab`, `Space`, `Delete`, `Insert`, `Home`, `End`, `PageUp`, `PageDown`
 - Arrows: `ArrowUp`, `ArrowDown`, `ArrowLeft`, `ArrowRight`
 
+## Contributing
+
+Contributions are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a PR. It covers the build commands, the PR workflow and DCO sign-off (`git commit -s`). Please follow the [Code of Conduct](CODE_OF_CONDUCT.md).
+
+To report a security vulnerability, don't open a public issue. Follow [SECURITY.md](SECURITY.md) instead.
+
 ## License
 
 GPL-3.0 - See [LICENSE](LICENSE) for details.
