@@ -19,11 +19,13 @@ pikvm_mcp_server/
 │   ├── index.ts        # Main MCP server entry point (tool + prompt handlers)
 │   ├── config.ts       # Configuration handling
 │   ├── pikvm/          # PiKVM API client
-│   │   └── client.ts
+│   │   ├── client.ts
+│   │   ├── auto-calibrate.ts  # Vision-based auto-calibration (screenshot diffing)
+│   │   └── lock.ts         # Busy lock that blocks other tools during auto-calibration
 │   └── prompts/        # MCP prompt definitions
 │       ├── types.ts    # PromptDefinition interface
-│       ├── tool-guides.ts  # 8 individual tool guide prompts
-│       ├── workflows.ts    # 5 multi-step workflow prompts
+│       ├── tool-guides.ts  # 9 individual tool guide prompts
+│       ├── workflows.ts    # 6 multi-step workflow prompts
 │       ├── skill-tools.ts  # Auto-generated skill_* tools from prompts
 │       └── index.ts    # Barrel export + lookup function
 ├── docs/skills/        # Human-readable skill guides (mirrors prompts)
@@ -34,8 +36,8 @@ pikvm_mcp_server/
 ## Development Commands
 
 ```bash
-# Install dependencies
-npm install
+# Install dependencies (exact versions from package-lock.json)
+npm ci
 
 # Build
 npm run build
@@ -56,6 +58,9 @@ The server is configured via environment variables or a config file:
 - `PIKVM_PASSWORD` - Auth password
 - `PIKVM_VERIFY_SSL` - Whether to verify SSL certs (default: `false` for self-signed)
 - `PIKVM_DEFAULT_KEYMAP` - Default keyboard layout (default: `en-us`)
+- `PIKVM_CALIBRATION_ROUNDS` - Auto-calibration sampling rounds (default: `5`)
+- `PIKVM_CALIBRATION_VERIFY_ROUNDS` - Auto-calibration verification rounds (default: `5`)
+- `PIKVM_CALIBRATION_MOVE_DELAY` - Delay in ms after each mouse move during auto-calibration (default: `300`)
 
 ## MCP Tools Provided
 
@@ -78,12 +83,13 @@ The server is configured via environment variables or a config file:
 10. **`pikvm_set_calibration`** - Set calibration correction factors after visual verification
 11. **`pikvm_get_calibration`** - Get current calibration state
 12. **`pikvm_clear_calibration`** - Clear calibration, revert to uncalibrated mode
+13. **`pikvm_auto_calibrate`** - Automatically detect the cursor via screenshot diffing and set calibration factors (preferred over manual calibration)
 
 ## MCP Prompts & Skill Tools
 
-The server exposes 13 skills as both MCP prompts (`prompts/list` / `prompts/get`) and read-only `skill_*` tools (`tools/list` / `tools/call`). The skill tools are auto-generated from prompt definitions for marketplace visibility (e.g. LobeHub indexes tools, not prompts).
+The server exposes 15 skills as both MCP prompts (`prompts/list` / `prompts/get`) and read-only `skill_*` tools (`tools/list` / `tools/call`). The skill tools are auto-generated from prompt definitions for marketplace visibility (e.g. LobeHub indexes tools, not prompts).
 
-**Total tools: 25** (12 `pikvm_*` hardware tools + 13 `skill_*` guidance tools)
+**Total tools: 28** (13 `pikvm_*` hardware tools + 15 `skill_*` guidance tools)
 
 ### Tool Guides
 | Prompt | Skill Tool | Covers |
@@ -96,6 +102,7 @@ The server exposes 13 skills as both MCP prompts (`prompts/list` / `prompts/get`
 | `move-mouse` | `skill_move_mouse` | pikvm_mouse_move |
 | `click-element` | `skill_click_element` | pikvm_mouse_click |
 | `scroll-page` | `skill_scroll_page` | pikvm_mouse_scroll |
+| `auto-calibrate` | `skill_auto_calibrate` | pikvm_auto_calibrate |
 
 ### Workflow Recipes
 | Prompt | Skill Tool | Arguments | Description |
@@ -105,6 +112,7 @@ The server exposes 13 skills as both MCP prompts (`prompts/list` / `prompts/get`
 | `click-ui-element-workflow` | `skill_click_ui_element_workflow` | element_description (required) | Find and click a UI element |
 | `fill-form-workflow` | `skill_fill_form_workflow` | form_description (optional) | Fill in form fields |
 | `navigate-desktop-workflow` | `skill_navigate_desktop_workflow` | goal (required) | Navigate desktop with Observe-Plan-Act-Verify loop |
+| `auto-calibrate-mouse-workflow` | `skill_auto_calibrate_mouse_workflow` | — | Automatic mouse calibration with pikvm_auto_calibrate |
 
 Implementation: `src/prompts/` (types.ts, tool-guides.ts, workflows.ts, skill-tools.ts, index.ts). Human-readable guides: `docs/skills/`.
 
