@@ -9,7 +9,7 @@ pikvm_mcp_server lets an MCP client control a physical machine through PiKVM. Is
 Please report privately. Do not open a public issue or PR.
 
 1. Preferred: use GitHub's **Report a vulnerability** button under the repository's Security tab (private vulnerability reporting).
-2. Alternative: email <!-- TODO: security contact address -->.
+2. Alternative: email [security@kultivator.co.nz](mailto:security@kultivator.co.nz).
 
 Include affected version or commit, reproduction steps, and impact. We aim to acknowledge within 5 business days and to give a fix timeline after triage.
 
