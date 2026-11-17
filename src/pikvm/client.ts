@@ -7,6 +7,7 @@
 
 import { Agent, fetch } from 'undici';
 import sharp from 'sharp';
+import { detectDisplayArea, type DisplayArea } from './display-area.js';
 
 export interface PiKVMConfig {
   host: string;
@@ -41,7 +42,25 @@ export interface ScreenshotResult {
   actualHeight: number;
   scaleX: number;
   scaleY: number;
+  /** Region of the capture holding the remote desktop (excludes black bars) */
+  displayArea: DisplayArea;
 }
+
+/**
+ * Non-2xx response from the PiKVM API
+ */
+export class PiKVMApiError extends Error {
+  constructor(public readonly status: number, message: string) {
+    super(message);
+    this.name = 'PiKVMApiError';
+  }
+}
+
+// The streamer answers 503 when a snapshot is requested while it is still
+// busy (e.g. back-to-back captures during auto-calibration). Retry with backoff.
+const SNAPSHOT_RETRY_DELAYS_MS = [250, 500, 1000, 2000];
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // PiKVM uses signed 16-bit integers for absolute mouse coordinates
 const MOUSE_COORD_MIN = -32768;
@@ -87,6 +106,11 @@ export class PiKVMClient {
     scaleY: number;
   } | null = null;
   private calibration: CalibrationState | null = null;
+  /**
+   * Region of the capture that the remote desktop occupies. Null until a
+   * full-resolution frame has been analysed for the current resolution.
+   */
+  private displayArea: DisplayArea | null = null;
 
   constructor(config: PiKVMConfig) {
     this.config = {
@@ -150,7 +174,7 @@ export class PiKVMClient {
         .replace(/password[=:][^\s,"]*/gi, 'password=[REDACTED]')
         .replace(/X-KVMD-Passwd[^,\s"]*/gi, 'X-KVMD-Passwd=[REDACTED]')
         .substring(0, 200); // Limit error message length
-      throw new Error(`PiKVM API error ${response.status}: ${sanitizedError}`);
+      throw new PiKVMApiError(response.status, `PiKVM API error ${response.status}: ${sanitizedError}`);
     }
 
     // Check content type for response handling
@@ -178,6 +202,21 @@ export class PiKVMClient {
   }
 
   /**
+   * GET a streamer snapshot, retrying while the streamer reports 503 (busy).
+   */
+  private async requestSnapshot<T>(path: string): Promise<T> {
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await this.request<T>('GET', path);
+      } catch (err) {
+        const retryable = err instanceof PiKVMApiError && err.status === 503;
+        if (!retryable || attempt >= SNAPSHOT_RETRY_DELAYS_MS.length) throw err;
+        await sleep(SNAPSHOT_RETRY_DELAYS_MS[attempt]);
+      }
+    }
+  }
+
+  /**
    * Take a screenshot and calculate coordinate scaling factors
    */
   async screenshot(options?: {
@@ -194,7 +233,7 @@ export class PiKVMClient {
     }
 
     const path = `/streamer/snapshot${params.toString() ? '?' + params : ''}`;
-    const arrayBuffer = await this.request<ArrayBuffer>('GET', path);
+    const arrayBuffer = await this.requestSnapshot<ArrayBuffer>(path);
     const buffer = Buffer.from(arrayBuffer);
 
     // Get actual screen resolution (force refresh to ensure accuracy)
@@ -206,6 +245,12 @@ export class PiKVMClient {
       throw new Error('Failed to read screenshot dimensions');
     }
     const dimensions = { width: metadata.width, height: metadata.height };
+
+    // Locate the remote desktop inside the frame (black-bar detection).
+    // Only full-resolution frames are analysed, so the area is in screen pixels.
+    if (!params.has('preview')) {
+      await this.updateDisplayArea(buffer);
+    }
 
     // Calculate and store scale factors
     const scaleX = actualResolution.width / dimensions.width;
@@ -220,7 +265,42 @@ export class PiKVMClient {
       actualHeight: actualResolution.height,
       scaleX,
       scaleY,
+      displayArea: this.getDisplayArea(actualResolution),
     };
+  }
+
+  /**
+   * Re-detect the active display area from a full-resolution frame.
+   * An inconclusive result (e.g. an all-black frame) keeps the previous area.
+   */
+  private async updateDisplayArea(frame: Buffer): Promise<void> {
+    const detected = await detectDisplayArea(frame);
+    if (detected) {
+      this.displayArea = detected;
+    }
+  }
+
+  /**
+   * The region of the capture holding the remote desktop, or the full frame
+   * if it hasn't been detected.
+   */
+  getDisplayArea(resolution: ScreenResolution): DisplayArea {
+    return this.displayArea ?? { x: 0, y: 0, width: resolution.width, height: resolution.height };
+  }
+
+  /**
+   * Make sure the display area has been detected for the current resolution.
+   * Captures a frame internally if needed; the frame is never returned.
+   * Detection failures fall back to the full frame.
+   */
+  private async ensureDisplayArea(): Promise<void> {
+    if (this.displayArea) return;
+    try {
+      const frame = Buffer.from(await this.requestSnapshot<ArrayBuffer>('/streamer/snapshot'));
+      await this.updateDisplayArea(frame);
+    } catch {
+      // Leave undetected; mouse mapping uses the full frame.
+    }
   }
 
   /**
@@ -253,6 +333,11 @@ export class PiKVMClient {
       throw new Error('Invalid or missing resolution data from PiKVM streamer API');
     }
 
+    if (this.cachedResolution &&
+        (this.cachedResolution.width !== resolution.width || this.cachedResolution.height !== resolution.height)) {
+      // Bars depend on the capture resolution; re-detect on the next frame.
+      this.displayArea = null;
+    }
     this.cachedResolution = {
       width: resolution.width,
       height: resolution.height,
@@ -264,13 +349,19 @@ export class PiKVMClient {
    * Convert pixel coordinates to PiKVM's normalized coordinate system
    * PiKVM uses range -32768 to 32767 for absolute positioning
    *
+   * The HID range spans the remote desktop, which may not fill the capture
+   * (letterbox/pillarbox), so pixels are mapped from the detected display area.
+   * Points in the black bars clamp to the nearest desktop edge.
+   *
    * Calibration factors are applied to compensate for resolution-dependent
    * coordinate scaling issues. Without calibration, factors default to 1.0.
    */
   private pixelToNormalized(pixelX: number, pixelY: number, resolution: ScreenResolution): { x: number; y: number } {
+    const area = this.getDisplayArea(resolution);
+
     // Calculate base normalized coordinates
-    const baseX = remap(pixelX, 0, resolution.width - 1, MOUSE_COORD_MIN, MOUSE_COORD_MAX);
-    const baseY = remap(pixelY, 0, resolution.height - 1, MOUSE_COORD_MIN, MOUSE_COORD_MAX);
+    const baseX = remap(pixelX, area.x, area.x + area.width - 1, MOUSE_COORD_MIN, MOUSE_COORD_MAX);
+    const baseY = remap(pixelY, area.y, area.y + area.height - 1, MOUSE_COORD_MIN, MOUSE_COORD_MAX);
 
     // Apply calibration factors if available, otherwise use 1.0 (no correction)
     const factorX = this.calibration?.factorX ?? 1.0;
@@ -294,6 +385,7 @@ export class PiKVMClient {
   async calibrate(): Promise<CalibrationResult> {
     // Force refresh resolution to ensure accuracy
     const resolution = await this.getResolution(true);
+    await this.ensureDisplayArea();
 
     // Calculate center position
     const centerX = Math.round(resolution.width / 2);
@@ -362,6 +454,7 @@ export class PiKVMClient {
    */
   async mouseMoveRaw(x: number, y: number): Promise<void> {
     const resolution = await this.getResolution();
+    await this.ensureDisplayArea();
 
     // Temporarily clear calibration to get raw coordinates
     const savedCalibration = this.calibration;
@@ -456,6 +549,7 @@ export class PiKVMClient {
       calibrationInvalidated = true;
     }
 
+    await this.ensureDisplayArea();
     const normalized = this.pixelToNormalized(scaled.x, scaled.y, resolution);
 
     const params = new URLSearchParams();

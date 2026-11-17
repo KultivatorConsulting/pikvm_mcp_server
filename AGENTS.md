@@ -21,6 +21,7 @@ pikvm_mcp_server/
 │   ├── pikvm/          # PiKVM API client
 │   │   ├── client.ts
 │   │   ├── auto-calibrate.ts  # Vision-based auto-calibration (screenshot diffing)
+│   │   ├── display-area.ts    # Black-bar (letterbox/pillarbox) detection
 │   │   └── lock.ts         # Busy lock that blocks other tools during auto-calibration
 │   └── prompts/        # MCP prompt definitions
 │       ├── types.ts    # PromptDefinition interface
@@ -122,6 +123,8 @@ Implementation: `src/prompts/` (types.ts, tool-guides.ts, workflows.ts, skill-to
 - The `/api/hid/print` endpoint is the best way to type text - it handles keymap conversion
 - Mouse coordinates are absolute (0-based, screen resolution dependent)
 - Some operations may need delays between them for the target system to process
+- **Black bars**: When the target's output doesn't match the capture resolution (e.g. a 16:10 desktop captured at 1280x720), PiKVM shows it with black bars, but the absolute mouse range spans the target's desktop, not the capture. `src/pikvm/display-area.ts` detects the active area on every full-resolution capture (bars must be symmetric; the narrower side wins so dark content at one edge isn't mistaken for a bar; the remaining area must have a standard aspect ratio, otherwise the previous result is kept). `pixelToNormalized` maps from that area, so screenshot coordinates work as-is. Without this, clicks drift by up to the bar width (~45px seen at 1280x720 with 64px bars) and the scale-only calibration can't correct it. The area resets when resolution changes; if a mouse move happens before any screenshot, the client captures a frame internally (never returned) to detect it.
+- **Snapshot retries**: The streamer returns 503 when snapshots are requested back to back (e.g. during auto-calibration). `requestSnapshot` in `client.ts` retries 503s with backoff (250/500/1000/2000ms); all `/streamer/snapshot` calls go through it.
 - **Calibration**: Mouse coordinates often need calibration at different resolutions. The calibration workflow is: call `pikvm_calibrate` to move cursor to center, take a screenshot to verify actual position, then call `pikvm_set_calibration` with correction factors. Calibration is automatically invalidated when resolution changes.
 
 ## Testing
