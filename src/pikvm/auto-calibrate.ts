@@ -16,7 +16,7 @@ export interface AutoCalibrationConfig {
   rounds: number;           // default 5
   verifyRounds: number;     // default 5
   moveDelayMs: number;      // default 300
-  diffThreshold: number;    // default 30
+  diffThreshold: number;    // default 90 (summed RGB delta)
   minClusterSize: number;   // default 4
   maxClusterSize: number;   // default 2500
   maxRetries: number;       // default 3
@@ -60,7 +60,9 @@ const DEFAULT_CONFIG: AutoCalibrationConfig = {
   rounds: 5,
   verifyRounds: 5,
   moveDelayMs: 300,
-  diffThreshold: 30,
+  // Capture/JPEG noise between identical frames reaches ~60 (summed RGB);
+  // cursor edges against any background are several hundred.
+  diffThreshold: 90,
   minClusterSize: 4,
   maxClusterSize: 2500,
   maxRetries: 3,
